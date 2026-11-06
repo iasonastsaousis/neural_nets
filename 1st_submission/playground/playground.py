@@ -9,7 +9,7 @@ POINTS = {
     "red": [[5, 6], [4, 5], [4, 6], [6, 6], [5, 4]],
 }
 
-NEW_POINT = [3, 3]
+NEW_POINT = [3.6, 3.7]
 
 CLASS_COLORS = {"blue": "#104DCA", "red": "#FF0000"}
 
