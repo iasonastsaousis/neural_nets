@@ -4,7 +4,39 @@ from collections import Counter
 from pathlib import Path
 import pickle
 
-# --- shared math ---
+# --- data loading ---
+
+def unpickle(file):
+    with open(file, 'rb') as fo:
+        dataset = pickle.load(fo, encoding='bytes')
+    return dataset
+
+
+def load_dataset(path):
+    training_dataset = unpickle(path / "train")
+    test_dataset = unpickle(path / "test")
+    meta = unpickle(path / "meta")
+    class_names = [name.decode("utf-8") for name in meta[b"fine_label_names"]]
+    return training_dataset, test_dataset, class_names
+
+
+# --- data preprocessing ---
+
+def preprocess_data(dataset):
+    # Use the same numeric type and pixel scale for training and test images.
+    X = dataset[b"data"].astype(np.float32) / 255.0
+    y = np.array(dataset[b"fine_labels"])
+    return X, y
+
+
+def group_by_class(X, y):
+    points = {}
+    for category in np.unique(y):
+        points[category] = X[y == category]
+    return points
+
+
+# --- classifiers and shared math ---
 
 def euclidean_distance(p, q):
     return np.sqrt(np.sum((np.array(p) - np.array(q)) ** 2))
@@ -30,7 +62,8 @@ class KNearestNeighbors:
                 distance = euclidean_distance(point, new_point)
                 distances.append((distance, category, point))
 
-        return sorted(distances)[: self.k]
+        # Exclude image arrays from comparisons when distance and category tie.
+        return sorted(distances, key=lambda item: (item[0], item[1]))[: self.k]
 
     def predict(self, new_point):
         categories = [category for _, category, _ in self.k_nearest(new_point)]
@@ -58,104 +91,105 @@ class NearestClassCentroid:
         )
 
 
-# --- load dataset ---
+# --- fitting ---
 
-def unpickle(file):
-    with open(file, 'rb') as fo:
-        dict = pickle.load(fo, encoding='bytes')
-    return dict
+def fit_classifiers(points):
+    classifiers = {
+        "1-NN": KNearestNeighbors(k=1),
+        "3-NN": KNearestNeighbors(k=3),
+        "NCC": NearestClassCentroid(),
+    }
+    for classifier in classifiers.values():
+        classifier.fit(points)
+    return classifiers
 
 
+# --- evaluation ---
 
+def evaluate_classifier(classifier, X_test, y_test):
+    """Return predictions and accuracy for an already fitted classifier."""
+    if len(X_test) == 0:
+        raise ValueError("The evaluation set must contain at least one image.")
+    if len(X_test) != len(y_test):
+        raise ValueError("Each evaluation image must have one label.")
+
+    predictions = []
+    correct_predictions = 0
+
+    for i in range(len(X_test)):
+        prediction = classifier.predict(X_test[i])
+        predictions.append(prediction)
+        if prediction == y_test[i]:
+            correct_predictions += 1
+
+    accuracy = correct_predictions / len(X_test)
+    return np.array(predictions), accuracy
+
+
+# --- visualization ---
+
+def plot_predictions(X, y, class_names, predictions=None, model_name=None):
+    """Show up to 16 images, optionally with already computed predictions."""
+    count = min(16, len(X))
+    if count == 0:
+        return
+
+    columns = min(4, count)
+    rows = (count + columns - 1) // columns
+    fig, axes = plt.subplots(
+        rows, columns, figsize=(2.5 * columns, 2.5 * rows), squeeze=False
+    )
+    if model_name is not None:
+        fig.suptitle(model_name)
+
+    for i, ax in enumerate(axes.flat):
+        ax.axis("off")
+        if i >= count:
+            continue
+
+        image = X[i].reshape(3, 32, 32).transpose(1, 2, 0)
+        ax.imshow(image)
+        if predictions is None:
+            ax.set_title(class_names[y[i]])
+        else:
+            ax.set_title(
+                f"Predicted: {class_names[predictions[i]]}\n"
+                f"Actual: {class_names[y[i]]}"
+            )
+
+    fig.tight_layout()
+    plt.show()
 
 
 # --- experiment runner ---
 
 def main():
-
-    # Loading the Dataset
-
     path = Path(__file__).resolve().parent.parent / "dataset" / "cifar-100-python"
-    training_dataset = unpickle(path / "train")
-    validation_dataset = unpickle(path / "test")
-    meta = unpickle(path / "meta")
+    training_dataset, test_dataset, class_names = load_dataset(path)
+    X_train, y_train = preprocess_data(training_dataset)
+    X_test, y_test = preprocess_data(test_dataset)
 
-    class_names = [
-        name.decode("utf-8")
-        for name in meta[b"fine_label_names"]
-    ]
+    # print(X_train.shape)  # (images, features): 32 * 32 * 3 = 3072 features
+    # print(y_train.shape)  # One class label per image.
+    # plot_predictions(X_train[:16], y_train[:16], class_names)
 
-    # --------------------------------------------------- #
+    points = group_by_class(X_train, y_train) # returns dict with {0: [500x3072], 1: [500x3072]}
+    # print(len(points))
+    # print(points[0].shape)
+    # print(points[19].shape)
 
-    # Exploring the Dataset
+    classifiers = fit_classifiers(points)
+    results = {}
+    for name, classifier in classifiers.items():
+        print(f"Evaluating {name} on {len(y_test)} test images...", flush=True)
+        predictions, accuracy = evaluate_classifier(classifier, X_test, y_test)
+        results[name] = predictions
+        print(f"{name} test accuracy: {accuracy:.2%} ({len(y_test)} images)", flush=True)
 
-    # 3072 columns because we have 32x32 images, 3 color channels RGB
-    # 32x32x3 = 1024x3 = 3072 features
-
-    X = training_dataset[b"data"]
-    y = np.array(training_dataset[b"fine_labels"])
-
-    print(X.shape)  # X is a vector with dimensions 50000 
-                    #(row = number of images), 3072 (column = number of features)
-    print(y.shape)  # Y is a 50000x1 vector (a class for each image)
-
-
-    # Plotting 16 images
-    fig, axes = plt.subplots(4, 4, figsize=(10, 10))
-
-    for i, ax in enumerate(axes.flat):
-
-        image = X[i].reshape(3, 32, 32).transpose(1, 2, 0)
-
-        ax.imshow(image)
-        ax.set_title(class_names[y[i]])
-        ax.axis("off")
-
-    plt.tight_layout()
-    plt.show()
-
-    # Making the dataset compatible with our classifiers
-
-    points = {}
-
-    for category in np.unique(y):
-        points[category] = X[y == category]
-
-    # Now points is a dict with:
-    # { 0: [500x3076]
-    #   1: [500x3076]} etc
-    print(len(points))       # 100
-    print(points[0].shape)   # (500, 3072)
-    print(points[19].shape)  # (500, 3072)
-
-    ncc = NearestClassCentroid()
-
-    ncc.fit(points)
-
-    print(len(ncc.centroids))
-    print(ncc.centroids[0].shape)
-
-    X_test = validation_dataset[b"data"]
-    y_test = np.array(validation_dataset[b"fine_labels"])
-
-    new_image = X_test[0]
-
-    prediction = ncc.predict(new_image)
-
-    print("Predicted:", class_names[prediction])
-    print("Actual:", class_names[y_test[0]])
-
-    image = new_image.reshape(3, 32, 32).transpose(1, 2, 0)
-
-    plt.imshow(image)
-    plt.title(
-        f"Predicted: {class_names[prediction]}\n"
-        f"Actual: {class_names[y_test[0]]}"
-    )
-    plt.axis("off")
-    plt.show()
-    
-
+    for name, predictions in results.items():
+        plot_predictions(
+            X_test[:16], y_test[:16], class_names, predictions[:16], model_name=name
+        )
 
 
 if __name__ == "__main__":
