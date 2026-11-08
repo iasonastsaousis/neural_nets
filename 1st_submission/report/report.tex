@@ -3,8 +3,8 @@
 \documentclass[letterpaper,journal]{IEEEtran}
 \usepackage{fontspec}
 \usepackage{polyglossia}
-\setdefaultlanguage{greek}
-\setotherlanguage{english}
+\setdefaultlanguage{english}
+\setotherlanguage{greek}
 \setmainfont{FreeSerif}
 \setsansfont{FreeSans}
 \setmonofont[Scale=0.80]{DejaVu Sans Mono}
@@ -32,11 +32,6 @@
   backgroundcolor=\color{softgray},numbers=left,numberstyle=\tiny\color{black!50},
   numbersep=5pt,xleftmargin=1.2em,framexleftmargin=0.4em,
   aboveskip=8pt,belowskip=8pt}
-\renewcommand{\abstractname}{Περίληψη}
-\renewcommand{\IEEEkeywordsname}{Λέξεις κλειδιά}
-\renewcommand{\figurename}{Σχήμα}
-\renewcommand{\tablename}{Πίνακας}
-\renewcommand{\refname}{Βιβλιογραφία}
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\train}{\mathrm{train}}
@@ -44,92 +39,87 @@
 \input{results.tex}
 
 \begin{document}
-\title{Σύγκριση ταξινομητών 1-NN, 3-NN και NCC\\στο σύνολο εικόνων CIFAR-100}
-\author{Ενδιάμεση εργασία\;—\;Νευρωνικά Δίκτυα και Βαθιά Μάθηση}
-\markboth{Νευρωνικά Δίκτυα και Βαθιά Μάθηση — Ενδιάμεση Εργασία}%
-{Σύγκριση ταξινομητών στο CIFAR-100}
+\title{Comparing 1-NN, 3-NN and NCC\\on the CIFAR-100 Image Dataset}
+\author{Interim Assignment---Neural Networks and Deep Learning}
+\markboth{Neural Networks and Deep Learning---Interim Assignment}%
+{Comparing Classifiers on CIFAR-100}
 \maketitle
 
 \begin{abstract}
-Η εργασία συγκρίνει τους ταξινομητές πλησιέστερου γείτονα με έναν και τρεις
-γείτονες (1-NN και 3-NN) με τον ταξινομητή πλησιέστερου κέντρου κλάσης (NCC).
-Χρησιμοποιείται το CIFAR-100, με 50\,000 εικόνες εκπαίδευσης και 10\,000 εικόνες
-ελέγχου, και ως χαρακτηριστικά διατηρούνται οι 3\,072 τιμές RGB κάθε εικόνας.
-Παρουσιάζονται η οργάνωση των δεδομένων, η μετατροπή σε αριθμούς κινητής
-υποδιαστολής, η κλιμάκωση στο $[0,1]$, οι κανόνες ταξινόμησης και η μέτρηση
-της ορθότητας. Η αρχική, απλή υλοποίηση διατηρείται ως αναφορά και συγκρίνεται
-με ξεχωριστή βελτιστοποιημένη υλοποίηση CPU. Η βελτιστοποίηση αφορά τον τρόπο
-εκτέλεσης των υπολογισμών και όχι την εισαγωγή νέων χαρακτηριστικών ή τη μείωση
-του συνόλου εκπαίδευσης. Στο πλήρες σύνολο ελέγχου οι ορθότητες είναι
-17,55\%, 17,48\% και 10,04\% αντίστοιχα. Η κοινή αναζήτηση γειτόνων
-για τα δύο k-NN ολοκληρώνεται σε 10,32 s στη μετρημένη εκτέλεση CPU.
+This report compares nearest-neighbor classification with one and three
+neighbors (1-NN and 3-NN) against the nearest class centroid classifier (NCC).
+CIFAR-100 provides 50,000 training images and 10,000 test images; each image
+is represented by its 3,072 RGB values. The report explains the data layout,
+floating-point conversion, scaling to $[0,1]$, classification rules and accuracy
+measurement. The original implementation is retained as a reference and compared
+with a separate optimized CPU implementation. Optimization changes how the
+calculations are executed, without introducing new features or reducing the
+training set. Full-test accuracies are 17.55\%, 17.48\% and 10.04\%, respectively.
+The shared neighbor search for both k-NN classifiers takes 10.32 seconds in
+the measured CPU run.
 \end{abstract}
 
 \begin{IEEEkeywords}
-CIFAR-100, ταξινόμηση εικόνων, k-NN, πλησιέστερο κέντρο κλάσης,
-ευκλείδεια απόσταση, ορθότητα, υπολογιστικό κόστος.
+CIFAR-100, image classification, k-NN, nearest class centroid, Euclidean
+distance, accuracy, computational cost.
 \end{IEEEkeywords}
 
-\section{Στόχος και πειραματική προσέγγιση}
-Στόχος είναι η σύγκριση τριών απλών κανόνων ταξινόμησης πάνω στα ίδια δεδομένα.
-Το ερώτημα είναι ποιο ποσοστό των εικόνων ελέγχου ταξινομεί σωστά κάθε κανόνας
-όταν χρησιμοποιούνται απευθείας οι τιμές των εικονοστοιχείων. Δεύτερο ερώτημα
-είναι πώς διαφέρει το υπολογιστικό κόστος ανάμεσα στην αποθήκευση όλων των
-παραδειγμάτων, όπως στο k-NN, και στη σύνοψή τους με ένα κέντρο ανά κλάση,
-όπως στο NCC.
+\section{Objective and Experimental Approach}
+The objective is to compare three simple classification algorithms on the same
+dataset. The first question is how accurately each rule classifies unseen
+images when raw pixel values are used as features. The second is how the
+computational cost differs between retaining all training examples, as in
+k-NN, and representing each class by a single centroid, as in NCC.
 
-Δεν εκπαιδεύεται νευρωνικό δίκτυο σε αυτό το παραδοτέο. Επίσης δεν εφαρμόζονται
-PCA, αύξηση δεδομένων ή εξαγωγή χαρακτηριστικών από προεκπαιδευμένο μοντέλο.
-Έτσι η σύγκριση αφορά συγκεκριμένα τους τρεις ταξινομητές στον ίδιο χώρο RGB.
-Οι τιμές $k=1$ και $k=3$ προκύπτουν από την εκφώνηση και δεν επιλέγονται
-ύστερα από δοκιμές στο σύνολο ελέγχου.
+This interim assignment does not train a neural network. No PCA, data
+augmentation or pretrained feature extractor is applied. The comparison
+therefore concerns these three classifiers in the same RGB feature space.
+The values $k=1$ and $k=3$ are specified by the assignment rather than selected
+by tuning on test results \cite{assignment}.
 
-\section{Το σύνολο δεδομένων και η αναπαράστασή του}
-Το CIFAR-100 περιλαμβάνει έγχρωμες εικόνες $32\times32$ εικονοστοιχείων,
-κατανεμημένες σε 100 κλάσεις. Σε κάθε κλάση αντιστοιχούν 500 εικόνες
-εκπαίδευσης και 100 εικόνες ελέγχου. Οι κλάσεις περιλαμβάνουν ζώα, φυτά,
-αντικείμενα, οχήματα και σκηνές. Χρησιμοποιούνται οι λεπτομερείς ετικέτες
-\code{fine\_labels}, όχι οι 20 υπερκλάσεις \cite{cifar,krizhevsky}.
+\section{Dataset and Representation}
+CIFAR-100 contains color images of $32\times32$ pixels from 100 classes.
+Each class has 500 training and 100 test images. The classes include animals,
+plants, objects, vehicles and scenes. This experiment uses the
+\code{fine\_labels}, not the 20 superclass labels \cite{cifar,krizhevsky}.
 
-Η έκδοση Python διαθέτει αρχεία \code{train}, \code{test} και \code{meta}.
-Τα δύο πρώτα περιέχουν εικόνες και ετικέτες, ενώ το τρίτο αντιστοιχίζει τους
-αριθμητικούς κωδικούς στα ονόματα κλάσεων. Διατηρείται ο επίσημος διαχωρισμός:
-οι εικόνες ελέγχου δεν χρησιμοποιούνται ούτε για τον σχηματισμό των κέντρων
-ούτε ως υποψήφιοι γείτονες.
+The Python distribution provides \code{train}, \code{test} and \code{meta}
+files. The first two hold images and labels; the last maps numeric class IDs
+to class names. The official split is retained: test images are neither
+included among candidate neighbors nor used to calculate class centroids.
 
 \begin{table}[t]
-\caption{Πίνακες εισόδου και ετικετών}
+\caption{Input arrays and class labels}
 \label{tab:shapes}
 \centering\small
 \begin{tabular}{@{}lll@{}}
 \toprule
-Μεταβλητή & Σχήμα NumPy & Περιεχόμενο\\
+Variable & NumPy shape & Contents\\
 \midrule
-$X_{\train}$ & $(50\,000,3\,072)$ & Εικόνες εκπαίδευσης\\
-$y_{\train}$ & $(50\,000,)$ & Κλάση κάθε εικόνας\\
-$X_{\test}$ & $(10\,000,3\,072)$ & Εικόνες ελέγχου\\
-$y_{\test}$ & $(10\,000,)$ & Πραγματικές κλάσεις\\
+$X_{\train}$ & $(50\,000,3\,072)$ & Training images\\
+$y_{\train}$ & $(50\,000,)$ & Training class IDs\\
+$X_{\test}$ & $(10\,000,3\,072)$ & Test images\\
+$y_{\test}$ & $(10\,000,)$ & True test class IDs\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Από την εικόνα στη γραμμή του πίνακα}
-Κάθε εικόνα έχει τρία κανάλια χρώματος, άρα
+\subsection{From an Image to a Matrix Row}
+Each image has three color channels, so its feature count is
 \begin{equation}
 D=32\cdot32\cdot3=3\,072.
 \end{equation}
-Στο αρχείο δεδομένων οι τιμές έχουν ήδη μετατραπεί σε διάνυσμα: προηγούνται
-οι 1\,024 τιμές του κόκκινου καναλιού, ακολουθούν οι 1\,024 του πράσινου και
-έπειτα οι 1\,024 του μπλε. Μία γραμμή του $X$ επομένως είναι μία ολόκληρη
-εικόνα, ενώ μία στήλη αντιστοιχεί σε συγκεκριμένη θέση και κανάλι. Η τιμή
-$y_i$ είναι η κλάση της ίδιας εικόνας στη γραμμή $i$. Το $y$ είναι μονοδιάστατος
-πίνακας NumPy, όχι πίνακας με 100 στήλες ούτε κωδικοποίηση one-hot.
+The stored images are already flattened: the first 1,024 entries are the red
+channel, followed by 1,024 green and 1,024 blue values. A row of $X$ is one
+complete image; a column corresponds to a particular pixel location and
+channel. The label $y_i$ describes the image in row $i$. In NumPy, $y$ is a
+one-dimensional array, not a 100-column matrix or a one-hot encoding.
 
 \begin{figure*}[t]
 \centering
 \begin{tikzpicture}[font=\small,>=Latex]
 \node[draw=navy,fill=softblue,rounded corners,minimum width=2.8cm,minimum height=2cm,align=center] (im) at (0,0)
-{Μία εικόνα RGB\\[3pt]$32\times32\times3$\\[3pt]3\,072 τιμές};
+{One RGB image\\[3pt]$32\times32\times3$\\[3pt]3\,072 values};
 \node[align=center,text=navy] at (6,1.8) {$X_{\train}\in\R^{50\,000\times3\,072}$};
 \draw[fill=red!12,draw=black!35] (3,0.55) rectangle (5,1.15);
 \draw[fill=green!12,draw=black!35] (5,0.55) rectangle (7,1.15);
@@ -138,13 +128,13 @@ $y_i$ είναι η κλάση της ίδιας εικόνας στη γραμ�
 \node at (6,0.85) {$G_0,\ldots,G_{1023}$};
 \node at (8,0.85) {$B_0,\ldots,B_{1023}$};
 \draw[fill=softblue,draw=black!35] (3,-0.05) rectangle (9,0.55);
-\node at (6,0.25) {δεύτερη εικόνα: ακόμη 3\,072 χαρακτηριστικά};
+\node at (6,0.25) {second image: another 3\,072 features};
 \draw[draw=black!35] (3,-0.65) rectangle (9,-0.05);
 \node at (6,-0.35) {$\vdots$};
 \draw[fill=softblue,draw=black!35] (3,-1.25) rectangle (9,-0.65);
-\node at (6,-0.95) {εικόνα με δείκτη $49\,999$};
+\node at (6,-0.95) {image with index $49\,999$};
 \draw[->,thick,navy] (im.east) -- (2.4,0) -- (2.4,0.85) -- (3,0.85);
-\node[align=center,text=teal] at (11.5,1.8) {$y_{\train}$\\σχήμα $(50\,000,)$};
+\node[align=center,text=teal] at (11.5,1.8) {$y_{\train}$\\shape $(50\,000,)$};
 \foreach \a/\b/\c in {0.55/1.15/0,-0.05/0.55/1,-1.25/-0.65/49999}{
 \draw[fill=softteal,draw=black!35] (10.2,\a) rectangle (12.8,\b);
 }
@@ -154,117 +144,118 @@ $y_i$ είναι η κλάση της ίδιας εικόνας στη γραμ�
 \node at (11.5,-0.95) {$y_{49\,999}$};
 \draw[->,teal,thick] (9,0.85) -- (10.2,0.85);
 \node[align=center,font=\footnotesize,text width=5.8cm] at (6,-1.85)
-{Γραμμή $i$: μία εικόνα\\Στήλη $j$: ένα χαρακτηριστικό};
+{Row $i$: one image\\Column $j$: one feature};
 \node[align=center,font=\footnotesize,text width=3.2cm] at (11.5,-1.85)
-{Ίδιος δείκτης $i$\\στην εικόνα και στην ετικέτα};
+{The same index $i$\\links image and label};
 \end{tikzpicture}
-\caption{Η σύνδεση εικόνων και ετικετών. Η επιπέδωση αλλάζει την αναπαράσταση,
-όχι τις τιμές των εικονοστοιχείων. Για το σύνολο ελέγχου ισχύει η ίδια δομή
-με 10\,000 γραμμές.}
+\caption{Images and their labels. Flattening changes the layout, not the pixel
+values. The test set has the same structure with 10\,000 rows.}
 \label{fig:matrix}
 \end{figure*}
 
-Για την προβολή αντιστρέφεται μόνο η διάταξη: η γραμμή μετασχηματίζεται
-αρχικά σε $(3,32,32)$ και στη συνέχεια σε $(32,32,3)$, όπως αναμένει η
-\code{imshow}. Η μετατροπή αυτή δεν συμμετέχει στην ταξινόμηση.
+For display, a row is reshaped to $(3,32,32)$ and then transposed to
+$(32,32,3)$, as required by \code{imshow}. This rearrangement is only for
+visualization and is not part of classification.
 
-\subsection{Προεπεξεργασία}
-Οι αρχικές τιμές αποθηκεύονται ως \code{uint8} στο διάστημα $[0,255]$.
-Πριν από τις αριθμητικές πράξεις μετατρέπονται σε \code{float32} και
-διαιρούνται με 255:
+\subsection{Preprocessing}
+The original values are stored as \code{uint8} in $[0,255]$. Before numerical
+operations, they are converted to \code{float32} and divided by 255:
 \begin{equation}
 \widetilde{x}_{ij}=\frac{\operatorname{float32}(x_{ij})}{255}.
 \label{eq:scaling}
 \end{equation}
-Οι ετικέτες παραμένουν ακέραιοι αριθμοί. Η μετατροπή τύπου αποτρέπει την
-αναδίπλωση της μη προσημασμένης αριθμητικής κατά την αφαίρεση και επιτρέπει
-την αναπαράσταση κλασματικών τιμών. Η διαίρεση αλλάζει την κλίμακα, π.χ.
-$0\mapsto0$, $51\mapsto0{,}2$ και $255\mapsto1$.
+Labels remain integers. Conversion prevents unsigned-integer wraparound
+during subtraction and allows fractional values. Division changes the scale:
+for example, $0\mapsto0$, $51\mapsto0.2$ and $255\mapsto1$.
 
-Η ίδια συνάρτηση εφαρμόζεται στα δύο σύνολα. Δεν υπολογίζονται παράμετροι
-κλιμάκωσης από το test set: το 255 είναι το γνωστό μέγιστο της αρχικής
-αναπαράστασης. Σε ακριβή αριθμητική η κοινή αυτή κλιμάκωση διατηρεί τη σειρά
-των ευκλείδειων αποστάσεων, επειδή
+The same function processes both splits. No scaling parameters are learned
+from the test set: 255 is the known maximum of the original representation.
+In exact arithmetic, this common scaling preserves Euclidean distance order:
 \begin{equation}
 d(\mathbf{x}/255,\mathbf{z}/255)=d(\mathbf{x},\mathbf{z})/255.
 \end{equation}
-Άρα δεν αναμένεται από μόνη της βελτίωση της ορθότητας του k-NN ή του NCC.
+Scaling alone is therefore not expected to improve k-NN or NCC accuracy.
 
-\subsection{Ομαδοποίηση κατά κλάση}
-Η αρχική υλοποίηση σχηματίζει το λεξικό \code{points}. Το κλειδί είναι ο
-αριθμός κλάσης και η τιμή ένας πίνακας με τις εικόνες της:
+\subsection{Grouping by Class}
+The original implementation constructs a dictionary, \code{points}, whose
+keys are class IDs and whose values contain the corresponding training images:
 \begin{equation}
-\code{points}[c]=X_{\train}[y_{\train}=c]
-\quad\text{με σχήμα }(500,3\,072).
+\code{points}[c]=X_{\train}[y_{\train}=c],
+\quad\text{shape }(500,3\,072).
 \end{equation}
-Η έκφραση $y=c$ δημιουργεί μία λογική μάσκα: επιλέγονται ακριβώς οι γραμμές
-που έχουν την αντίστοιχη ετικέτα. Η ομαδοποίηση χρησιμοποιεί μόνο το σύνολο
-εκπαίδευσης.
+The expression $y=c$ creates a Boolean mask that selects rows with the
+corresponding label. Only training images enter this grouping.
 
-\section{Οι τρεις ταξινομητές}
-\subsection{Ευκλείδεια απόσταση}
-Κοινό μέτρο ομοιότητας είναι η ευκλείδεια απόσταση δύο διανυσμάτων:
+\section{The Three Classifiers}
+\subsection{Euclidean Distance}
+The shared distance measure between two feature vectors is
 \begin{equation}
 d(\mathbf{x},\mathbf{z})=
 \sqrt{\sum_{j=1}^{D}(x_j-z_j)^2}.
 \label{eq:distance}
 \end{equation}
-Κάθε χαρακτηριστικό έχει το ίδιο βάρος. Δεν υπάρχει ειδική μεταχείριση
-γειτονικών εικονοστοιχείων, περιγραμμάτων ή σχημάτων. Δύο εικόνες μπορεί
-να θεωρηθούν κοντινές λόγω παρόμοιου φόντου ή χρωματισμού, χωρίς να απεικονίζουν
-το ίδιο είδος αντικειμένου.
+Every feature has equal weight. There is no special treatment of neighboring
+pixels, contours or object shapes. Images may be close because of similar
+backgrounds or colors, even when they depict different kinds of objects.
 
-\subsection{1-NN και 3-NN}
-Στο k-NN η κλήση \code{fit()} αποθηκεύει τα παραδείγματα εκπαίδευσης.
-Δεν υπολογίζονται βάρη και δεν εκτελείται επαναληπτική ελαχιστοποίηση σφάλματος.
-Για μία νέα εικόνα υπολογίζονται οι αποστάσεις από όλες τις εικόνες εκπαίδευσης
-και επιλέγεται το σύνολο $\mathcal{N}_k(\mathbf{x})$ των $k$ κοντινότερων.
-Η πρόβλεψη είναι
+\subsection{1-NN and 3-NN}
+For k-NN, \code{fit()} stores the training examples. It does not learn weights
+or iteratively minimize an error function. Given a new image, distances to
+all training images are calculated and the $k$ nearest examples form the
+neighborhood $\mathcal{N}_k(\mathbf{x})$. The prediction is
 \begin{equation}
 \widehat{y}=\arg\max_c\sum_{i\in\mathcal{N}_k(\mathbf{x})}
 \mathbf{1}[y_i=c].
 \end{equation}
-Το 1-NN αντιγράφει την κλάση του κοντινότερου παραδείγματος. Το 3-NN
-χρησιμοποιεί την πλειοψηφία των τριών κοντινότερων. Οι ψήφοι δεν σταθμίζονται
-με την απόσταση.
+The 1-NN rule copies the nearest example's class. The 3-NN rule uses a
+majority vote among three examples. Votes are not distance-weighted.
 
-Στην αρχική έκδοση οι γείτονες ταξινομούνται πρώτα ως προς την απόσταση και
-έπειτα ως προς τον αριθμό κλάσης. Οι πίνακες εικόνων εξαιρούνται από το κλειδί
-ταξινόμησης, διότι η σύγκρισή τους σε ισοπαλία δεν δίνει μία απλή λογική τιμή.
-Αν στο 3-NN εμφανιστούν τρεις διαφορετικές κλάσεις, το \code{Counter} επιλέγει
-την πρώτη κλάση στη σειρά των γειτόνων που έχει το μέγιστο πλήθος ψήφων:
-συνήθως αυτή του κοντινότερου γείτονα, με την προηγούμενη σύμβαση στις ακριβείς
-ισοπαλίες αποστάσεων.
+Two kinds of ties need a rule. First, when training images have exactly the
+same distance from the test image, the image with the smaller numerical
+class ID is placed first. This gives a consistent ordering when selecting
+the nearest neighbors; the class ID does not measure similarity.
 
-\subsection{Πλησιέστερο κέντρο κλάσης (NCC)}
-Για κάθε κλάση $c$ υπολογίζεται το κέντρο
+Second, the three selected neighbors may all belong to different classes.
+For example, labels A, A, B give class A two votes, so A wins. Labels A, B, C
+give each class one vote. In this implementation, \code{Counter} breaks
+that voting tie by choosing the label that appears first in the sorted
+neighbor list. Therefore, the closest neighbor's class wins; if distances
+also tie, the smaller-class-ID rule above determines which comes first.
+
+The sorting key contains only distance and class ID. The stored image arrays
+are excluded because NumPy compares arrays element by element, producing
+multiple Boolean values rather than the single true-or-false decision
+Python needs to order two entries.
+
+\subsection{Nearest Class Centroid (NCC)}
+For each class $c$, the centroid is
 \begin{equation}
 \boldsymbol{\mu}_c=\frac{1}{n_c}\sum_{i:y_i=c}\mathbf{x}_i,
 \qquad n_c=500.
 \end{equation}
-Η πράξη \code{mean(axis=0)} παίρνει τον μέσο όρο κάθε στήλης, δηλαδή κάθε
-θέσης και καναλιού, πάνω στις εικόνες της κλάσης. Παράγονται 100 διανύσματα
-μήκους 3\,072. Η νέα εικόνα ταξινομείται ως
+The operation \code{mean(axis=0)} averages each column, hence each pixel
+position and channel, across the class's training images. This yields 100
+vectors of length 3,072. A new image is assigned to
 \begin{equation}
 \widehat{y}=\arg\min_{c\in\{0,\ldots,99\}}
 d(\mathbf{x},\boldsymbol{\mu}_c).
 \end{equation}
-Ο NCC συγκρίνει συνεπώς μία εικόνα με 100 κέντρα αντί για 50\,000 παραδείγματα.
-Η οικονομία αυτή έχει κόστος αναπαράστασης: διαφορετικές εμφανίσεις της ίδιας
-κλάσης συνοψίζονται σε έναν μοναδικό μέσο όρο. Σε ακριβή ισοπαλία επιλέγεται
-η πρώτη κλάση με την ελάχιστη απόσταση, με τις κλάσεις σε αύξουσα σειρά.
+NCC compares an image with 100 centroids instead of 50,000 examples. This
+saves computation but summarizes potentially diverse appearances of a class
+by one mean vector. Exact distance ties select the first minimum; classes
+are in ascending order in the experiment.
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[font=\footnotesize,>=Latex,node distance=6mm,
 block/.style={draw=navy,rounded corners,fill=softblue,align=center,minimum height=9mm,text width=6.6cm},
 smallblock/.style={draw=teal,rounded corners,fill=softteal,align=center,text width=2.8cm,minimum height=12mm}]
-\node[block] (load) at (0,0) {Ανάγνωση CIFAR-100 και κοινή προεπεξεργασία};
-\node[smallblock] (train) at (-1.8,-1.2) {50\,000 εικόνες\\εκπαίδευσης};
-\node[smallblock] (test) at (1.8,-1.2) {10\,000 εικόνες\\ελέγχου};
-\node[smallblock] (fit) at (-1.8,-2.7) {Αποθήκευση γειτόνων\\ή υπολογισμός κέντρων};
-\node[smallblock] (predict) at (1.8,-2.7) {Πρόβλεψη κλάσης\\για κάθε εικόνα};
-\node[block] (score) at (0,-4.2) {Σύγκριση προβλέψεων με $y_{\test}$\\Ορθότητα και οπτικοποίηση};
+\node[block] (load) at (0,0) {Load CIFAR-100 and apply the same preprocessing};
+\node[smallblock] (train) at (-1.8,-1.2) {50\,000 training\\images};
+\node[smallblock] (test) at (1.8,-1.2) {10\,000 test\\images};
+\node[smallblock] (fit) at (-1.8,-2.7) {Store training examples\\or compute centroids};
+\node[smallblock] (predict) at (1.8,-2.7) {Predict one class\\for each image};
+\node[block] (score) at (0,-4.2) {Compare predictions with $y_{\test}$\\Accuracy and visualization};
 \draw[->,navy] (load.south) -- +(0,-0.2) -| (train.north);
 \draw[->,navy] (load.south) -- +(0,-0.2) -| (test.north);
 \draw[->,navy] (train.south) -- (fit.north);
@@ -272,88 +263,82 @@ smallblock/.style={draw=teal,rounded corners,fill=softteal,align=center,text wid
 \draw[->,navy] (fit.east) -- (predict.west);
 \draw[->,navy] (predict.south) -- +(0,-0.3) -| (score.north);
 \end{tikzpicture}
-\caption{Διαχωρισμός της εκπαίδευσης από την αξιολόγηση. Οι αληθινές ετικέτες
-ελέγχου χρησιμοποιούνται για τη βαθμολόγηση των προβλέψεων.}
+\caption{Training and evaluation are separate stages. True test labels are
+used to score predictions, not to fit the classifiers.}
 \label{fig:pipeline}
 \end{figure}
 
-\section{Οργάνωση και βελτιστοποίηση του κώδικα}
-\subsection{Αρχική έκδοση}
-Το \code{src/main.py} χωρίζεται σε συναρτήσεις με διακριτές ευθύνες:
+\section{Code Organization and Optimization}
+\subsection{Original Implementation}
+The file \code{src/main.py} separates responsibilities into functions:
 \begin{itemize}
-\item \code{load\_dataset}: ανάγνωση των αρχείων και ονομάτων κλάσεων.
-\item \code{preprocess\_data}: μετατροπή τύπου, κλιμάκωση και ετικέτες.
-\item \code{group\_by\_class}: ομαδοποίηση μόνο των εικόνων εκπαίδευσης.
-\item \code{fit\_classifiers}: δημιουργία και προσαρμογή των τριών μοντέλων.
-\item \code{evaluate\_classifier}: προβλέψεις και μέτρηση ορθότητας.
-\item \code{plot\_predictions}: εικόνες με πραγματική και προβλεπόμενη κλάση.
+\item \code{load\_dataset}: read the data files and class names.
+\item \code{preprocess\_data}: convert and scale images; extract labels.
+\item \code{group\_by\_class}: group training examples by class.
+\item \code{fit\_classifiers}: create and fit the three models.
+\item \code{evaluate\_classifier}: collect predictions and calculate accuracy.
+\item \code{plot\_predictions}: show images with true and predicted labels.
 \end{itemize}
-Η \code{main()} συνδέει τα στάδια. Η αξιολόγηση ολοκληρώνεται πριν ανοίξουν
-τα παράθυρα γραφημάτων και οι εικόνες χρησιμοποιούν ήδη αποθηκευμένες
-προβλέψεις. Έτσι δεν επαναλαμβάνεται η ταξινόμηση για την οπτικοποίηση.
+The \code{main()} function connects these stages. Evaluation finishes before
+plot windows open, and visualization reuses saved predictions rather than
+classifying the displayed images again.
 
-Η αρχική αναζήτηση k-NN είναι εύκολη στην παρακολούθηση αλλά περιέχει έναν
-βρόχο Python για κάθε εικόνα εκπαίδευσης και πλήρη ταξινόμηση των αποστάσεων.
-Για ολόκληρο το test set, κάθε ανεξάρτητη εκτέλεση k-NN απαιτεί
+The original k-NN search is easy to follow, but performs a Python loop over
+every training image and sorts every distance. A full test pass requires
 \begin{equation}
 50\,000\cdot10\,000=500\,000\,000
 \end{equation}
-συγκρίσεις εικόνων, με 3\,072 χαρακτηριστικά ανά σύγκριση. Η εκτέλεση
-ξεχωριστά για $k=1$ και $k=3$ επαναλαμβάνει τον ίδιο υπολογισμό αποστάσεων.
-Η έκδοση αυτή είναι λειτουργική, αλλά ο μεγάλος χρόνος αποτέλεσε το κίνητρο
-για βελτιστοποίηση, όχι ένδειξη αποτυχίας του αλγορίθμου.
+image-pair comparisons, each involving 3,072 features. Separate runs for
+$k=1$ and $k=3$ duplicate the distance calculations. This implementation
+works; its high runtime motivated optimization rather than indicating an
+algorithmic failure.
 
-\subsection{Ξεχωριστή βελτιστοποιημένη έκδοση}
+\subsection{Separate Optimized Implementation}
 \input{optimized-description.tex}
 
-\section{Αξιολόγηση και αποτελέσματα}
-\subsection{Πρωτόκολλο και μετρική}
-Όλοι οι ταξινομητές χρησιμοποιούν την ίδια αναπαράσταση και τις ίδιες ετικέτες.
-Η ορθότητα (accuracy) είναι
+\section{Evaluation and Results}
+\subsection{Protocol and Metric}
+All classifiers use the same input representation and labels. Accuracy is
 \begin{equation}
 A=\frac{1}{N_{\test}}\sum_{i=1}^{N_{\test}}
 \mathbf{1}[\widehat{y}_i=y_i].
 \end{equation}
-Η μετρική αυτή απαντά ποιο ποσοστό των εικόνων αναγνωρίστηκε σωστά. Δεν είναι
-η ανά κλάση precision. Εδώ το test set είναι ισοκατανεμημένο στις 100 κλάσεις,
-οπότε η συνολική ορθότητα αποτελεί άμεση, εύληπτη βάση σύγκρισης. Ένας κανόνας
-που προβλέπει πάντα μία σταθερή κλάση πετυχαίνει ακριβώς $1\%$ στο πλήρες
-σύνολο ελέγχου.
+It measures the fraction of correctly classified images, and differs from
+per-class precision. The test set is balanced over 100 classes, making
+accuracy a direct basis for comparison. Always predicting a fixed class
+would achieve exactly $1\%$ on the full test set.
 
-Οι χρόνοι πρόβλεψης μετρώνται χωριστά από φόρτωση αρχείων και γραφήματα.
-Το μικρό αρχικό πείραμα των 20 εικόνων χρησιμοποιήθηκε μόνο για έλεγχο της
-λειτουργίας και του κόστους. Δεν χρησιμοποιείται ως υποκατάστατο της τελικής
-σύγκρισης. Η σύγκριση ταχύτητας μεταξύ εκδόσεων απαιτεί ίδιο πλήθος εικόνων
-και ίδιο σύνολο εκπαίδευσης. Οι προεκτάσεις χρόνου σημειώνονται ως εκτιμήσεις,
-όχι ως πραγματικές πλήρεις εκτελέσεις.
+Prediction timing excludes data loading and plotting. The preliminary
+20-image run was only a functionality and runtime check, not a substitute
+for the final comparison. Speed comparisons use the same test examples and
+training set. Extrapolated runtimes are identified as estimates rather
+than measurements of full runs.
 
-\subsection{Μετρήσεις}
+\subsection{Measurements}
 \input{measurements.tex}
 
-\subsection{Παραδείγματα ταξινόμησης}
+\subsection{Classification Examples}
 \input{examples.tex}
 
-\section{Συζήτηση και περιορισμοί}
-Η ευκλείδεια απόσταση πάνω σε ακατέργαστες τιμές RGB δεν παρέχει αναλλοιωτότητα
-ως προς μετατόπιση, προσανατολισμό ή αλλαγές φωτισμού. Η μικρή ανάλυση επίσης
-περιορίζει την οπτική πληροφορία. Έτσι, ακόμη και ένα αντικείμενο που είναι
-εύκολα αναγνωρίσιμο από άνθρωπο δεν είναι υποχρεωτικά κοντά στα παραδείγματα
-της ίδιας κλάσης στον συγκεκριμένο διανυσματικό χώρο.
+\section{Discussion and Limitations}
+Euclidean distance on raw RGB values is not invariant to translation,
+orientation or lighting changes. Low image resolution also limits the
+available information. An object that is easily recognized by a person
+need not be close to images of its own class in this feature space.
 
-Το 3-NN μπορεί να περιορίσει την επιρροή ενός μεμονωμένου γείτονα, αλλά δεν
-υπάρχει εγγύηση ότι θα ξεπεράσει το 1-NN: οι πρόσθετοι γείτονες μπορεί να
-ανήκουν σε άλλη κλάση. Ο NCC μειώνει δραστικά τις συγκρίσεις κατά την πρόβλεψη,
-αλλά ένα μόνο κέντρο δεν αποτυπώνει πολλαπλές ομάδες εμφανίσεων της ίδιας
-κλάσης. Η μετρημένη σύγκριση αφορά αυτόν τον συνδυασμό δεδομένων,
-χαρακτηριστικών και απόστασης και όχι μία γενική κατάταξη των αλγορίθμων.
+Using three neighbors can reduce the influence of an individual example,
+but does not guarantee higher accuracy than 1-NN: the extra neighbors may
+belong to another class. NCC substantially reduces prediction work, but a
+single centroid cannot represent multiple appearance clusters within a
+class. The measured ranking concerns this dataset, representation and
+distance measure, not a universal ordering of the algorithms.
 
-Τα δεδομένα είναι ένα συγκεκριμένο σύνολο εικόνων αναφοράς και δεν τεκμηριώνουν
-απόδοση σε πραγματικές εφαρμογές ή σε εικόνες άλλης προέλευσης. Δεν
-πραγματοποιήθηκε ανεξάρτητος έλεγχος κάθε εικόνας για πιθανές ομοιότητες μεταξύ
-training και test. Διατηρήθηκε ο επίσημος διαχωρισμός και δεν προστέθηκαν
-δεδομένα από προσωπικές συλλογές. Η διάθεση των αρχικών εικόνων διέπεται από
-τους όρους της πηγής τους· δεν συνάγεται γενική άδεια επαναχρησιμοποίησης
-από τη δυνατότητα λήψης του συνόλου.
+This benchmark dataset does not establish performance on other image
+sources or real-world applications. No independent image-by-image audit
+of similarities between training and test images was performed. The
+official split was retained, and no personal image collections were added.
+Availability for download does not by itself establish unrestricted
+reuse rights for the underlying images.
 
 \input{conclusion.tex}
 
@@ -361,37 +346,36 @@ training και test. Διατηρήθηκε ο επίσημος διαχωρι�
 \onecolumn
 \lstset{basicstyle=\ttfamily\footnotesize}
 \appendices
-\section{Αρχική υλοποίηση: κρίσιμα αποσπάσματα}
-Τα παρακάτω αποσπάσματα προέρχονται απευθείας από το συνοδευτικό
-\code{src/main.py}. Το πλήρες αρχείο περιλαμβάνει επίσης φόρτωση,
-προεπεξεργασία, εκτέλεση και γραφήματα.
-\begin{minipage}{\linewidth}
+\section{Original Implementation: Key Excerpts}
+These excerpts are included directly from \code{src/main.py}. The complete
+accompanying file also contains data loading, preprocessing, execution and plotting.
+\par\noindent\begin{minipage}{\linewidth}
 \lstinputlisting[firstline=41,lastline=42]{../src/main.py}
-\end{minipage}
-\begin{minipage}{\linewidth}
+\end{minipage}\par
+\par\noindent\begin{minipage}{\linewidth}
 \lstinputlisting[firstline=56,lastline=70]{../src/main.py}
-\end{minipage}
-\begin{minipage}{\linewidth}
+\end{minipage}\par
+\par\noindent\begin{minipage}{\linewidth}
 \lstinputlisting[firstline=78,lastline=91]{../src/main.py}
-\end{minipage}
-\begin{minipage}{\linewidth}
+\end{minipage}\par
+\par\noindent\begin{minipage}{\linewidth}
 \lstinputlisting[firstline=109,lastline=126]{../src/main.py}
-\end{minipage}
+\end{minipage}\par
 
 \clearpage
-\section{Βελτιστοποιημένη υλοποίηση: κρίσιμα αποσπάσματα}
+\section{Optimized Implementation: Key Excerpts}
 \input{optimized-listings.tex}
 
 \begin{thebibliography}{3}
 \bibitem{cifar}
-A. Krizhevsky, V. Nair και G. Hinton, ``CIFAR-10 and CIFAR-100 datasets.''
+A. Krizhevsky, V. Nair and G. Hinton, ``CIFAR-10 and CIFAR-100 datasets.''
 \url{https://www.cs.toronto.edu/~kriz/cifar.html}.
 \bibitem{krizhevsky}
-A. Krizhevsky, \textenglish{\emph{Learning Multiple Layers of Features from
-Tiny Images}}, τεχνική αναφορά, University of Toronto, 2009, κεφ.~3.
+A. Krizhevsky, \emph{Learning Multiple Layers of Features from Tiny Images},
+technical report, University of Toronto, 2009, ch.~3.
 \url{https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf}.
 \bibitem{assignment}
-Εκφώνηση πρώτης υποχρεωτικής εργασίας, μάθημα «Νευρωνικά Δίκτυα -- Βαθιά
-Μάθηση», ενότητα «Ενδιάμεση Εργασία», 2026.
+First compulsory assignment, ``Neural Networks---Deep Learning,''
+section ``Interim Assignment,'' 2026.
 \end{thebibliography}
 \end{document}

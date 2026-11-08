@@ -1,29 +1,27 @@
-Οι μετρήσεις έγιναν σε CPU AMD Ryzen 9 7950X με οκτώ νήματα OpenBLAS,
-Python 3.10.12, NumPy 1.24.3 και OpenBLAS 0.3.21. Το μέγεθος ομάδας
-ήταν 128. Δεν χρησιμοποιήθηκε GPU. Οι χρόνοι είναι μία μέτρηση πραγματικού
-χρόνου ανά περίπτωση, μετά από σύντομη προθέρμανση, και εξαρτώνται από
-το μηχάνημα και τον ταυτόχρονο φόρτο του. Δεν παρουσιάζονται ως μέσοι όροι
-πολλών επαναλήψεων.
+Measurements used an AMD Ryzen 9 7950X CPU, eight OpenBLAS threads,
+Python 3.10.12, NumPy 1.24.3 and OpenBLAS 0.3.21. Batch size was 128.
+No GPU was used. Each reported prediction time is one wall-clock
+measurement after a short warm-up, not an average of repeated runs.
+Timings depend on the machine and its concurrent workload.
 
-Για σύγκριση των δύο εκδόσεων επιλέχθηκε μία εικόνα ελέγχου από κάθε κλάση,
-με γεννήτρια \code{default\_rng} και σπόρο 2026: συνολικά 100 εικόνες.
-Κάθε ταξινομητής χρησιμοποίησε και τις 50\,000 εικόνες εκπαίδευσης.
-Στο κοινό αυτό δείγμα κάθε βελτιστοποιημένη έκδοση συμφώνησε με την αντίστοιχη
-αρχική σε \textbf{100 από 100 προβλέψεις}. Η συμφωνία αυτή ελέγχει το
-δείγμα, όχι κάθε δυνατή αριθμητική ισοπαλία. Για τον NCC εκτελέστηκε επιπλέον
-και η αρχική έκδοση σε ολόκληρο το test set, με συμφωνία 10\,000/10\,000.
+The common comparison sample contained one test image per class, selected
+with \code{default\_rng} and seed 2026: 100 images in total. Every classifier
+used all 50,000 training examples. Each optimized model agreed with its
+original on \textbf{all 100 predictions}. This validates the sample, not
+every possible numerical tie. The original NCC was also run on the entire
+test set, yielding agreement on all 10,000 predictions.
 
 \begin{table}[t]
-\caption{Πλήρης αξιολόγηση: 10\,000 εικόνες ελέγχου}
+\caption{Full evaluation on 10,000 test images}
 \label{tab:accuracy}
 \centering\small
 \begin{tabular}{@{}lrr@{}}
 \toprule
-Ταξινομητής & Σωστές προβλέψεις & Ορθότητα\\
+Classifier & Correct predictions & Accuracy\\
 \midrule
-1-NN & 1\,755 & 17,55\%\\
-3-NN & 1\,748 & 17,48\%\\
-NCC & 1\,004 & 10,04\%\\
+1-NN & 1\,755 & 17.55\%\\
+3-NN & 1\,748 & 17.48\%\\
+NCC & 1\,004 & 10.04\%\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -31,49 +29,49 @@ NCC & 1\,004 & 10,04\%\\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/accuracy.pdf}
-\caption{Μετρημένη ορθότητα των βελτιστοποιημένων εκδόσεων στο πλήρες
-test set. Η διακεκομμένη γραμμή δείχνει το 1\% ενός σταθερού προβλεπόμενου
-κωδικού κλάσης στο ισοκατανεμημένο σύνολο.}
+\caption{Measured accuracy of the optimized implementations on the full
+test set. The dashed line marks the 1\% achieved by a constant class
+prediction on this balanced dataset.}
 \label{fig:accuracy}
 \end{figure}
 
 \begin{table}[t]
-\caption{Χρόνος πρόβλεψης στο ίδιο δείγμα 100 εικόνων}
+\caption{Prediction time on the same 100-image sample}
 \label{tab:timing}
 \centering\small
 \begin{tabular}{@{}lrrr@{}}
 \toprule
-Μοντέλο & Αρχική (s) & Βελτ. (s) & Λόγος\\
+Model & Original (s) & Optimized (s) & Speedup\\
 \midrule
-1-NN & 24,173 & 0,0916 & $263,8\times$\\
-3-NN & 24,031 & 0,1095 & $219,5\times$\\
-NCC & 0,0417 & 0,000589 & $70,9\times$\\
+1-NN & 24.173 & 0.0916 & $263.8\times$\\
+3-NN & 24.031 & 0.1095 & $219.5\times$\\
+NCC & 0.0417 & 0.000589 & $70.9\times$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Ο Πίνακας~\ref{tab:timing} αφορά ξεχωριστές κλήσεις πρόβλεψης ανά
-ταξινομητή. Στην τελική εκτέλεση η κοινή αναζήτηση για 1-NN και 3-NN
-ολοκληρώθηκε σε \textbf{10,319 s} για όλες τις 10\,000 εικόνες· ο χρόνος
-αυτός ανήκει \emph{και στα δύο αποτελέσματα μαζί}, όχι σε κάθε μοντέλο
-χωριστά. Η πρόβλεψη NCC χρειάστηκε 0,0567 s. Η αρχική NCC χρειάστηκε
-4,158 s στο ίδιο πλήρες σύνολο.
+Table~\ref{tab:timing} uses separate prediction calls for each classifier.
+In the final full run, the shared 1-NN/3-NN search took
+\textbf{10.319 s} for all 10,000 images. This is the time for
+\emph{both results together}, not an independent runtime for each model.
+It includes neighbor selection, voting and progress messages.
+Optimized NCC prediction took 0.0567 s; the original NCC took 4.158 s
+on the same full set.
 
-Το \code{fit()} της απλής k-NN αποθηκεύει μόνο μία αναφορά στο λεξικό και
-μετρήθηκε περίπου στο $1\,\mu$s. Η βελτιστοποιημένη κοινή προετοιμασία
-k-NN χρειάστηκε 1,523 s, επειδή δημιουργεί συνεχόμενο πίνακα
-\code{float64}, ετικέτες και τετράγωνα νορμών. Αυτή η προετοιμασία
-πληρώνεται μία φορά και δεν περιλαμβάνει τη φόρτωση ή την ομαδοποίηση.
-Ο σχηματισμός κέντρων NCC χρειάστηκε περίπου 0,023 s και στις δύο εκδόσεις.
+The original k-NN \code{fit()} only stores a dictionary reference and
+was measured at approximately $1\,\mu$s. Shared optimized k-NN preparation
+took 1.523 s because it constructs a contiguous \code{float64} matrix,
+labels and squared norms. This preparation is paid once and excludes
+loading and grouping. NCC centroid construction took about 0.023 s
+in both versions.
 
-Δεν εκτελέστηκαν οι δύο αρχικές k-NN στο πλήρες test set. Η αναγωγή των
-χρόνων του δείγματος δίνει περίπου 40 λεπτά ανά αρχικό πέρασμα· πρόκειται
-για \emph{εκτίμηση}, όχι πλήρη μέτρηση. Η αρχική υλοποίηση είναι λειτουργική.
-Η μετρημένη επιτάχυνση CPU κατέστησε περιττή την προσθήκη GPU ή PCA για
-το παρόν πείραμα.
+The original k-NN implementations were not run on the entire test set.
+Extrapolating their sample timings suggests about 40 minutes per original
+pass; this is an \emph{estimate}, not a measured full run. The original
+implementation is functional. The observed CPU acceleration made GPU
+support and PCA unnecessary for this experiment.
 
-Τα αρχεία \code{results/cpu\_benchmark.json} και
-\code{results/predictions.npz} περιέχουν αντίστοιχα τη ρύθμιση, τις
-μετρήσεις και τις προβλέψεις στην αρχική σειρά του test set. Το JSON
-καταγράφει επίσης τους δείκτες του δείγματος και αποτυπώματα SHA-256 των
-πηγαίων αρχείων της μετρημένης εκτέλεσης.
+The files \code{results/cpu\_benchmark.json} and
+\code{results/predictions.npz} retain the settings, measurements and full
+predictions in original test-set order. The JSON also records sample
+indices and SHA-256 hashes of the measured source files.

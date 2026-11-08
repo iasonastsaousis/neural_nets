@@ -32,7 +32,7 @@ def main():
     axis.bar_label(bars, labels=[f"{value:.2f}%" for value in values], padding=4)
     axis.axhline(1, color="#777777", linestyle="--", linewidth=1)
     axis.text(2.35, 1.4, "1%", color="#555555", ha="right", fontsize=8)
-    axis.set(ylabel="Ορθότητα (%)", ylim=(0, 21))
+    axis.set(ylabel="Accuracy (%)", ylim=(0, 21))
     axis.grid(axis="y", alpha=0.16)
     axis.set_axisbelow(True)
     figure.savefig(figures / "accuracy.pdf")

@@ -1,6 +1,8 @@
 # CIFAR-100: 1-NN, 3-NN and NCC
 
-The Greek report is `report/report.pdf`; its source is `report/report.tex`.
+The English report is `report/report.pdf`; its source is `report/report.tex`.
+The earlier Greek version is preserved separately in `report/greek-version.zip`
+in the workspace; that backup is not included in the English submission archive.
 Both implementations use all 50,000 training images and the official 10,000-image
 test split, without PCA or a neural network.
 

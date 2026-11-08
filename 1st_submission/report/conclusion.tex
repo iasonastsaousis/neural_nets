@@ -1,16 +1,16 @@
-\section{Συμπεράσματα}
-Στο συγκεκριμένο πείραμα το 1-NN πέτυχε 17,55\%, το 3-NN 17,48\%
-και ο NCC 10,04\%. Τα δύο k-NN βρίσκονται πολύ κοντά: η διαφορά είναι
-μόλις επτά σωστές προβλέψεις, δηλαδή 0,07 ποσοστιαίες μονάδες. Χωρίς
-περαιτέρω στατιστική ανάλυση δεν τεκμηριώνεται γενική υπεροχή του 1-NN.
-Και τα δύο ξεπέρασαν τον NCC σε αυτόν τον χώρο χαρακτηριστικών, ενώ ο
-NCC είχε πολύ χαμηλότερο κόστος πρόβλεψης.
+\section{Conclusion}
+In this experiment, 1-NN achieved 17.55\%, 3-NN 17.48\% and NCC 10.04\%.
+The k-NN results are very close: the difference is only seven correct
+predictions, or 0.07 percentage points. Without further statistical
+analysis, this does not establish general superiority of 1-NN.
+Both k-NN models outperformed NCC in this feature space, while NCC had
+much lower prediction cost.
 
-Η διάκριση αλγορίθμου και υλοποίησης ήταν ουσιαστική: η αρχική εκδοχή
-έκανε σαφή τη λειτουργία των κανόνων, ενώ η νέα αξιοποίησε πράξεις πινάκων,
-περιορισμένη επιλογή γειτόνων και κοινή αναζήτηση για δύο τιμές του $k$.
-Η συμφωνία με την αναφορά ελέγχθηκε πριν χρησιμοποιηθούν τα τελικά
-αποτελέσματα. Η πλήρης κοινή αναζήτηση k-NN ολοκληρώθηκε σε περίπου
-10,3 s σε CPU, χωρίς αλλαγή συνόλου εκπαίδευσης ή εφαρμογή PCA.
-Η σχετικά χαμηλή ορθότητα υπενθυμίζει ότι η ταχύτερη εκτέλεση δεν προσθέτει
-σημασιολογική πληροφορία στις αρχικές τιμές RGB.
+Distinguishing the algorithm from its implementation was important.
+The original code made the classification rules explicit; the optimized
+version used matrix operations, partial neighbor selection and a shared
+search for both values of $k$. Agreement with the reference was checked
+before using the final results. The full shared k-NN search completed in
+about 10.3 s on CPU, without reducing the training set or applying PCA.
+The modest accuracy illustrates that faster execution does not add
+semantic information to raw RGB features.

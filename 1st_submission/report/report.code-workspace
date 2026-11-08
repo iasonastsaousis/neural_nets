@@ -1,0 +1,38 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1500,
+    "latex-workshop.latex.autoBuild.run": "onFileChange",
+    "latex-workshop.latex.search.rootFiles.include": ["report.tex"],
+    "latex-workshop.latex.outDir": "%DIR%",
+    "latex-workshop.latex.recipe.default": "first",
+    "latex-workshop.latex.recipes": [
+      { "name": "Report (XeLaTeX)", "tools": ["report-xelatex"] }
+    ],
+    "latex-workshop.latex.tools": [
+      {
+        "name": "report-xelatex",
+        "command": "latexmk",
+        "args": [
+          "-xelatex",
+          "-synctex=1",
+          "-interaction=nonstopmode",
+          "-halt-on-error",
+          "-file-line-error",
+          "-outdir=%OUTDIR%",
+          "%DOC%"
+        ]
+      }
+    ],
+    "latex-workshop.view.pdf.viewer": "tab",
+    "latex-workshop.view.pdf.tab.editorGroup": "right",
+    "latex-workshop.view.pdf.zoom": "page-width",
+    "workbench.editorAssociations": {
+      "*.pdf": "latex-workshop-pdf-hook"
+    }
+  },
+  "extensions": {
+    "recommendations": ["James-Yu.latex-workshop"]
+  }
+}

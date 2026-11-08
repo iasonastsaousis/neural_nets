@@ -1,43 +1,49 @@
-Το αρχείο \code{src/optimized.py} περιέχει δύο νέες κλάσεις:
-\code{OptimizedKNearestNeighbors} και
-\code{OptimizedNearestClassCentroid}. Η αρχική έκδοση παραμένει ξεχωριστή.
-Δεν παραλείπονται εικόνες εκπαίδευσης και δεν εκτελείται προσεγγιστική
-αναζήτηση γειτόνων.
+The file \code{src/optimized.py} introduces
+\code{OptimizedKNearestNeighbors} and
+\code{OptimizedNearestClassCentroid}, while retaining the original implementation
+separately. All training images remain candidates; the search is exhaustive,
+not approximate.
 
-Για μία ομάδα $B$ εικόνων ελέγχου, οι αποστάσεις υπολογίζονται με την ταυτότητα
+For a batch of $B$ test images, squared Euclidean distances use the identity
 \begin{equation}
-\|\mathbf{x}-\mathbf{z}\|^2=
-\|\mathbf{x}\|^2+\|\mathbf{z}\|^2-2\mathbf{x}^{\mathsf T}\mathbf{z}.
+\|\mathbf{x}-\mathbf{z}\|_2^2=
+\|\mathbf{x}\|_2^2+\|\mathbf{z}\|_2^2-2\mathbf{x}^{\mathsf T}\mathbf{z}.
 \label{eq:fastdistance}
 \end{equation}
-Τα εσωτερικά γινόμενα υπολογίζονται με πολλαπλασιασμό πινάκων μέσω της
-βιβλιοθήκης BLAS. Τα τετράγωνα των νορμών των διανυσμάτων εκπαίδευσης
-υπολογίζονται μία φορά στη \code{fit()}. Δεν απαιτείται τετραγωνική ρίζα,
-επειδή είναι γνησίως αύξουσα συνάρτηση και δεν αλλάζει την κατάταξη.
+This is the vector equivalent of the familiar scalar expansion
+$(a-b)^2=a^2+b^2-2ab$. Here, $\|\mathbf{x}\|_2^2$ is the sum of the
+squared components of $\mathbf{x}$, and $\mathbf{x}^{\mathsf T}\mathbf{z}$
+is the dot product, the sum of products of corresponding components.
+The left-hand side is the squared distance, rather than the distance itself.
 
-Χρησιμοποιούνται ομάδες $B=128$ εικόνων. Ο πίνακας αποστάσεων μίας ομάδας
-έχει σχήμα $128\times50\,000$ και καταλαμβάνει περίπου 51,2 MB με
-\code{float64}. Δεν σχηματίζεται τρισδιάστατος πίνακας διαφορών
-$B\times50\,000\times3\,072$, ούτε αποθηκεύονται όλες οι αποστάσεις
-των 10\,000 εικόνων ταυτόχρονα. Η διαίρεση σε ομάδες περιορίζει τη μνήμη·
-η επιτάχυνση προκύπτει από τις αριθμητικές πράξεις σε πίνακες και τη
-μείωση της εργασίας στους βρόχους Python.
+This form lets us calculate distances for a whole batch using efficient
+BLAS matrix multiplication to compute the dot products. Squared training
+norms are calculated once during \code{fit()} and reused for every batch.
+We can also omit the square root because squared distances give the same
+nearest-neighbor ordering: taking a square root preserves the order of
+nonnegative values.
 
-Αντί για πλήρη ταξινόμηση 50\,000 τιμών, η \code{partition} βρίσκει το όριο
-της $k$-οστής μικρότερης απόστασης. Επιλέγονται και ταξινομούνται μόνο οι
-υποψήφιοι έως αυτό το όριο, συμπεριλαμβανομένων όλων των ισοπαλιών στο όριο.
-Η τελική σειρά ορίζεται από απόσταση, κωδικό κλάσης και σειρά παραδείγματος.
-Οι τρεις κοντινότεροι γείτονες αρκούν για να παραχθούν μαζί οι προβλέψεις
-1-NN και 3-NN, χωρίς δεύτερο πέρασμα αναζήτησης.
+With batches of $B=128$, the distance matrix has shape
+$128\times50\,000$ and occupies about 51.2 MB in \code{float64}.
+The code does not construct a three-dimensional difference array of shape
+$B\times50\,000\times3\,072$, or retain distances for all 10,000 test images
+at once. Batching controls memory; array operations and less work inside
+Python loops provide the speed improvement.
 
-Για τον NCC διατηρείται ο ίδιος υπολογισμός μέσων όρων ανά κλάση και
-εφαρμόζεται η ίδια ταυτότητα αποστάσεων προς τα 100 κέντρα. Σε ισοπαλία
-διατηρείται η σειρά κλάσεων της αρχικής έκδοσης.
+Instead of sorting all 50,000 values, \code{partition} finds the distance
+of the $k$th nearest example. Only candidates at or below that threshold
+are sorted, including all ties at the boundary. Their final order uses
+distance, class ID and training-example order. The nearest three neighbors
+are sufficient to produce both 1-NN and 3-NN predictions from one search.
 
-Οι είσοδοι παραμένουν κανονικοποιημένες τιμές \code{float32}, αλλά η
-βελτιστοποιημένη αριθμητική αποστάσεων γίνεται σε \code{float64}, ώστε να
-περιορίζεται το σφάλμα ακύρωσης της σχέσης~\eqref{eq:fastdistance}.
-Μικρές αρνητικές υπολογισμένες τιμές αντικαθίστανται με μηδέν.
-Η μαθηματική απόσταση είναι ίδια, αλλά δεν διατυπώνεται εγγύηση ταυτόσημων
-bits με την αρχική αριθμητική· οι σχεδόν ισόπαλες αποστάσεις χρειάζονται
-έλεγχο. Για αυτό συγκρίνονται ρητά οι προβλέψεις των δύο εκδόσεων.
+The optimized NCC retains the original class-mean calculation and uses the
+same distance identity against the 100 centroids. Its class order on exact
+distance ties is unchanged.
+
+Inputs are normalized \code{float32} values, while optimized distance
+arithmetic uses \code{float64} to reduce cancellation error in
+\eqref{eq:fastdistance}. Tiny negative computed squared distances are clipped
+to zero. The mathematical distance is unchanged, but bitwise equivalence
+with the original arithmetic is not guaranteed; nearly tied distances
+require care. Predictions are therefore explicitly compared against the
+original implementation.

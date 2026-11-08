@@ -135,8 +135,22 @@ Implementation decisions recorded before coding:
 6. `report/` is owned by the explicitly requested report subagent. It uses the
    provided IEEE template and reports only verified measurements.
 
-- [ ] Implement separate optimized models and reproducible benchmark runner.
-- [ ] Verify toy cases, tie handling, batch boundaries, and reference agreement.
-- [ ] Measure CPU speed and run the full test set if practical.
-- [ ] Integrate actual results and figures into the Greek report.
-- [ ] Compile and inspect the final PDF and accompanying code/results.
+- [x] Implement separate optimized models and reproducible benchmark runner.
+- [x] Verify toy cases, tie handling, batch boundaries, and reference agreement.
+- [x] Measure CPU speed and run the full test set if practical.
+- [x] Integrate actual results and figures into the Greek report.
+- [x] Compile and inspect the final PDF and accompanying code/results.
+
+Outcome: all four optimized-model tests passed. On a fixed-seed, stratified
+100-image sample, all three optimized classifiers matched the originals on
+100/100 predictions. Original versus optimized trial prediction times were
+24.173/0.0916 s (1-NN), 24.031/0.1095 s (3-NN), and 0.0417/0.000589 s (NCC).
+With eight CPU BLAS threads and batches of 128, the shared full 1-NN/3-NN search
+took 10.319 s. Full-test scores: 1-NN 1,755/10,000 (17.55%); 3-NN 1,748/10,000
+(17.48%); NCC 1,004/10,000 (10.04%). Full NCC agreement with the original was
+10,000/10,000. Original full k-NN runs were not performed. GPU work was unnecessary.
+Measurements, source hashes and predictions are saved in `../results/`.
+
+The user subsequently changed the report language to English. See
+`../report/AGENTS.md` Phase 2. The English PDF was compiled and visually inspected;
+the previous Greek PDF and sources were preserved as a separate backup.
