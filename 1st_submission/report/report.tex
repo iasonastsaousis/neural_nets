@@ -40,7 +40,8 @@
 
 \begin{document}
 \title{Comparing 1-NN, 3-NN and NCC\\on the CIFAR-100 Image Dataset}
-\author{Interim Assignment---Neural Networks and Deep Learning}
+\author{Interim Assignment---Neural Networks and Deep Learning\\
+Iason Tsaousis}
 \markboth{Neural Networks and Deep Learning---Interim Assignment}%
 {Comparing Classifiers on CIFAR-100}
 \maketitle
@@ -51,12 +52,12 @@ neighbors (1-NN and 3-NN) against the nearest class centroid classifier (NCC).
 CIFAR-100 provides 50,000 training images and 10,000 test images; each image
 is represented by its 3,072 RGB values. The report explains the data layout,
 floating-point conversion, scaling to $[0,1]$, classification rules and accuracy
-measurement. The original implementation is retained as a reference and compared
-with a separate optimized CPU implementation. Optimization changes how the
-calculations are executed, without introducing new features or reducing the
-training set. Full-test accuracies are 17.55\%, 17.48\% and 10.04\%, respectively.
-The shared neighbor search for both k-NN classifiers takes 10.32 seconds in
-the measured CPU run.
+measurement. The original implementation expresses the classification rules
+directly. Its execution cost motivated a separate AI-written CPU implementation
+for the full evaluation, with agreement checks against the original code.
+Full-test accuracies obtained using that implementation are 17.55\%, 17.48\%
+and 10.04\%, respectively. The report discloses and explains the computational
+changes; it does not present them as an independently developed contribution.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -67,9 +68,9 @@ distance, accuracy, computational cost.
 \section{Objective and Experimental Approach}
 The objective is to compare three simple classification algorithms on the same
 dataset. The first question is how accurately each rule classifies unseen
-images when raw pixel values are used as features. The second is how the
-computational cost differs between retaining all training examples, as in
-k-NN, and representing each class by a single centroid, as in NCC.
+images when raw pixel values are used as features. Computational cost is
+discussed to explain the practical constraints of evaluating k-NN on the full
+dataset, rather than as a performance comparison between implementations.
 
 This interim assignment does not train a neural network. No PCA, data
 augmentation or pretrained feature extractor is applied. The comparison
@@ -268,7 +269,7 @@ used to score predictions, not to fit the classifiers.}
 \label{fig:pipeline}
 \end{figure}
 
-\section{Code Organization and Optimization}
+\section{Code Organization and Execution Constraints}
 \subsection{Original Implementation}
 The file \code{src/main.py} separates responsibilities into functions:
 \begin{itemize}
@@ -290,11 +291,23 @@ every training image and sorts every distance. A full test pass requires
 \end{equation}
 image-pair comparisons, each involving 3,072 features. Separate runs for
 $k=1$ and $k=3$ duplicate the distance calculations. This implementation
-works; its high runtime motivated optimization rather than indicating an
-algorithmic failure.
+is functional, but its execution cost made full k-NN evaluation impractical
+within the available time. The original k-NN classifiers were therefore not
+run on all 10,000 test images.
 
-\subsection{Separate Optimized Implementation}
-\input{optimized-description.tex}
+\subsection{Use of AI-Written Evaluation Code}
+To make the full evaluation practical, AI assistance was used to write the
+separate implementation in \code{src/optimized.py}. This code is disclosed as
+AI-written, not presented as an independently developed optimization. The
+original classifier code remains in \code{src/main.py} as the explanatory
+reference. The accompanying evaluation runner and automated checks were also
+prepared with AI assistance.
+
+The separate implementation uses batched matrix operations and avoids fully
+sorting every distance list. It still considers all 50,000 training images,
+uses the same RGB features and implements the same classification rules.
+No PCA, approximate neighbor search or GPU is used. Appendix~\ref{app:ai}
+explains each component, its purpose and the numerical limitations.
 
 \section{Evaluation and Results}
 \subsection{Protocol and Metric}
@@ -308,13 +321,11 @@ per-class precision. The test set is balanced over 100 classes, making
 accuracy a direct basis for comparison. Always predicting a fixed class
 would achieve exactly $1\%$ on the full test set.
 
-Prediction timing excludes data loading and plotting. The preliminary
-20-image run was only a functionality and runtime check, not a substitute
-for the final comparison. Speed comparisons use the same test examples and
-training set. Extrapolated runtimes are identified as estimates rather
-than measurements of full runs.
+The reported accuracy uses all 10,000 official test images. The smaller
+reference sample described below checks agreement between implementations;
+it is not the basis of the reported full-test accuracy.
 
-\subsection{Measurements}
+\subsection{Accuracy and Implementation Checks}
 \input{measurements.tex}
 
 \subsection{Classification Examples}
@@ -332,13 +343,6 @@ belong to another class. NCC substantially reduces prediction work, but a
 single centroid cannot represent multiple appearance clusters within a
 class. The measured ranking concerns this dataset, representation and
 distance measure, not a universal ordering of the algorithms.
-
-This benchmark dataset does not establish performance on other image
-sources or real-world applications. No independent image-by-image audit
-of similarities between training and test images was performed. The
-official split was retained, and no personal image collections were added.
-Availability for download does not by itself establish unrestricted
-reuse rights for the underlying images.
 
 \input{conclusion.tex}
 
@@ -363,7 +367,10 @@ accompanying file also contains data loading, preprocessing, execution and plott
 \end{minipage}\par
 
 \clearpage
-\section{Optimized Implementation: Key Excerpts}
+\section{AI-Written Evaluation Implementation}
+\label{app:ai}
+\input{optimized-description.tex}
+\subsection{Key Code Excerpts}
 \input{optimized-listings.tex}
 
 \begin{thebibliography}{3}

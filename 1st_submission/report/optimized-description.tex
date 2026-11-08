@@ -1,8 +1,27 @@
-The file \code{src/optimized.py} introduces
-\code{OptimizedKNearestNeighbors} and
-\code{OptimizedNearestClassCentroid}, while retaining the original implementation
-separately. All training images remain candidates; the search is exhaustive,
-not approximate.
+The AI-written file \code{src/optimized.py} provides separate CPU versions
+of k-NN and NCC. This appendix explains the computational changes so that
+the method used to generate the accuracy results is explicit. The search
+remains exhaustive: all training images are considered for every query.
+
+\subsection{Preparing Training Data Once}
+The original k-NN model stores a dictionary of image arrays grouped by class.
+The separate version concatenates these groups into one contiguous matrix
+$R$ of shape $50\,000\times3\,072$. A parallel label array records the class
+of each row. Groups are visited in increasing class-ID order, and row order
+within each group is preserved. Thus, a selected row index can always be
+mapped back to its label.
+
+The matrix is converted to \code{float64} for distance arithmetic. This
+uses approximately 1.23 GB for the reference matrix alone, rather than
+0.614 GB for a \code{float32} matrix of the same size. Other arrays add to
+this memory requirement. The extra precision is discussed below. During
+\code{fit()}, the squared norm of every reference row is also stored:
+$r_j=\sum_{d=1}^{3072}R_{jd}^2$. The expression
+\code{einsum("ij,ij->i", R, R)} computes these sums of squares row by row.
+Since training images do not change between predictions, these values
+need to be calculated only once. This preparation learns no weights.
+
+\subsection{Squared Euclidean Distance}
 
 For a batch of $B$ test images, squared Euclidean distances use the identity
 \begin{equation}
@@ -16,34 +35,103 @@ squared components of $\mathbf{x}$, and $\mathbf{x}^{\mathsf T}\mathbf{z}$
 is the dot product, the sum of products of corresponding components.
 The left-hand side is the squared distance, rather than the distance itself.
 
-This form lets us calculate distances for a whole batch using efficient
-BLAS matrix multiplication to compute the dot products. Squared training
-norms are calculated once during \code{fit()} and reused for every batch.
-We can also omit the square root because squared distances give the same
+We can omit the square root because squared distances give the same
 nearest-neighbor ordering: taking a square root preserves the order of
 nonnegative values.
 
-With batches of $B=128$, the distance matrix has shape
-$128\times50\,000$ and occupies about 51.2 MB in \code{float64}.
-The code does not construct a three-dimensional difference array of shape
-$B\times50\,000\times3\,072$, or retain distances for all 10,000 test images
-at once. Batching controls memory; array operations and less work inside
-Python loops provide the speed improvement.
+\subsection{Matrix Multiplication and Reusing Norms}
+Let $Q$ hold a batch of $B$ test images, with shape $B\times3\,072$.
+The product $QR^{\mathsf T}$ has shape $B\times50\,000$; entry $(i,j)$
+is the dot product of test image $i$ with training image $j$. In the code,
+\code{queries @ references.T} computes this product. NumPy delegates this
+work to BLAS, a library of compiled linear algebra routines, rather than
+executing a separate Python distance-function call for every pair.
+The recorded evaluation allows OpenBLAS to use eight CPU threads.
 
-Instead of sorting all 50,000 values, \code{partition} finds the distance
-of the $k$th nearest example. Only candidates at or below that threshold
-are sorted, including all ties at the boundary. Their final order uses
-distance, class ID and training-example order. The nearest three neighbors
-are sufficient to produce both 1-NN and 3-NN predictions from one search.
+For each query row, compute $q_i=\sum_d Q_{id}^2$. The distance matrix is
+then filled using $D_{ij}=q_i+r_j-2(QR^{\mathsf T})_{ij}$.
+The code reshapes the query norms to $(B,1)$ and reference norms to
+$(1,50\,000)$. NumPy's broadcasting rules apply each query norm across
+its row and each reference norm down its column, without requiring the
+program to create repeated copies of the norm vectors. Multiplication by
+$-2$ and the additions update the same distance buffer in place, reducing
+the need for additional large temporary arrays.
 
-The optimized NCC retains the original class-mean calculation and uses the
-same distance identity against the 100 centroids. Its class order on exact
-distance ties is unchanged.
+\subsection{Batching to Control Memory}
+With $B=128$, one distance matrix has shape $128\times50\,000$.
+Its \code{float64} storage is $128\cdot50\,000\cdot8=51.2$ MB, compared
+with 4 GB for all $10\,000\times50\,000$ distances at once. These figures
+describe the distance matrix only, not total program memory.
+The code processes successive slices of test images, including a smaller
+last batch when needed. It retains the chosen neighbor indices rather
+than keeping all batch distance matrices.
 
+Batching does not reduce the number of image pairs considered or discard
+training examples. It limits temporary memory. The distance identity also
+avoids constructing a much larger array of per-feature differences with
+shape $B\times50\,000\times3\,072$. The saved work in Python comes from
+matrix operations; batching makes those operations manageable in memory.
+
+\subsection{Selecting Neighbors Without a Full Sort}
+The original code sorts all 50,000 distances, although only the first one
+or three are needed. The separate version uses \code{partition} to find
+the $k$th smallest distance without fully sorting the row. In zero-based
+indexing, that distance is at position $k-1$ after partitioning.
+
+All indices whose distances are at or below this threshold are collected.
+Including every boundary tie matters: choosing an arbitrary subset of
+equally distant images could change the predicted class. Only these
+candidates are then sorted with \code{lexsort}, using distance first,
+class ID second and training-row index third. Although the key arguments
+appear in the reverse order in the code, the last key has highest priority.
+The first $k$ indices are retained. This preserves the original ordering
+convention for equal computed distances, including stable row order when
+distance and class both tie. If many distances tie, the candidate set may
+still be large; partial selection does not guarantee a small final sort.
+
+\subsection{Sharing the Search for 1-NN and 3-NN}
+The method \code{predict\_for\_k} finds the largest requested number of
+neighbors once. For $k=1$ and $k=3$, it therefore finds three ordered
+neighbors per test image. The first label provides the 1-NN result;
+\code{Counter} counts the three labels for 3-NN, using the same voting
+tie rule as the original code. This avoids repeating the full distance
+calculation for two classifiers that use the same training data and
+distance measure. It changes neither the neighborhood size of each rule
+nor the weight of each vote.
+
+\subsection{Applying the Same Computation to NCC}
+NCC still calculates one mean vector per class with the original
+\code{mean(axis=0)} operation. Means are computed from the \code{float32}
+class arrays, then stored as \code{float64}; the centroid calculation itself
+is not replaced with a different model. The 100 centroids take the place
+of training rows in the shared distance function, producing a
+$B\times100$ distance matrix. The smallest entry in each row is selected
+by \code{argmin}, and its column index is mapped to the class label.
+The original dictionary order is retained, so exact ties still select
+the first class in that order.
+
+\subsection{Numerical Precision and Input Checks}
 Inputs are normalized \code{float32} values, while optimized distance
 arithmetic uses \code{float64} to reduce cancellation error in
-\eqref{eq:fastdistance}. Tiny negative computed squared distances are clipped
-to zero. The mathematical distance is unchanged, but bitwise equivalence
-with the original arithmetic is not guaranteed; nearly tied distances
-require care. Predictions are therefore explicitly compared against the
-original implementation.
+\eqref{eq:fastdistance}. Cancellation occurs when large, nearly equal
+terms are subtracted to obtain a small result. Rounding can even produce
+a tiny negative computed squared distance, although the mathematical
+quantity cannot be negative. The function clips negative results to zero
+in place. Extra precision reduces this issue but cannot eliminate all
+floating-point differences or guarantee identical neighbor rankings when
+distances are nearly tied.
+
+Consequently, mathematical equivalence is distinguished from measured
+agreement: all three classifiers match the originals on the fixed 100-image
+sample, and NCC also matches on all 10,000 test images. Full-test k-NN
+agreement was not measured. These limits still apply despite explicit
+tie handling and the small automated tests.
+
+The helper \code{query\_array} checks that queries form a two-dimensional
+array with the expected number of features and contain finite numbers.
+Other checks reject invalid neighbor counts, invalid batch sizes and
+prediction before fitting. These checks detect invalid use rather than
+improving classification accuracy. \code{predict\_many} returns one label
+per query row; the single-image \code{predict} wrapper adds a row dimension
+and extracts the one resulting label. Optional progress messages report
+completed batches and do not influence predictions.

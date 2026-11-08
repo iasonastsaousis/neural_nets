@@ -1,75 +1,66 @@
-# CIFAR-100: 1-NN, 3-NN and NCC
+# Setup and execution
 
-The English report is `report/report.pdf`; its source is `report/report.tex`.
-The earlier Greek version is preserved separately in `report/greek-version.zip`
-in the workspace; that backup is not included in the English submission archive.
-Both implementations use all 50,000 training images and the official 10,000-image
-test split, without PCA or a neural network.
+Run the commands below from the extracted submission directory.
 
-## Files
+## Install dependencies
 
-- `src/main.py`: original explanatory implementation and evaluation/plotting pipeline.
-- `src/optimized.py`: separate batched CPU implementations with deterministic tie rules.
-- `src/benchmark.py`: reproducible reference comparison and full optimized evaluation.
-- `src/test_optimized.py`: small reference, tie, and batch-boundary checks.
-- `results/cpu_benchmark.json`: measured settings, timings, scores and source hashes.
-- `results/predictions.npz`: full predictions and true labels, in original test order.
-- `report/build_figures.py`: regenerate report figures from recorded results.
-
-## Measured results
-
-| Model | Correct / 10,000 | Accuracy |
-|---|---:|---:|
-| 1-NN | 1,755 | 17.55% |
-| 3-NN | 1,748 | 17.48% |
-| NCC | 1,004 | 10.04% |
-
-The shared optimized 1-NN/3-NN search took 10.319 seconds on the recorded CPU,
-excluding data loading and fitting. It includes neighbor selection, voting and
-progress printing. This is one measured run, not a cross-machine guarantee.
-Optimized NCC prediction took 0.0567 seconds.
-
-On the fixed 100-image reference trial (one image per class), all three models
-matched their originals on every prediction. NCC additionally matched its
-original on all 10,000 test images. The original k-NN implementations were not
-run on all test images; their full-run times are estimates, not measurements.
-Distance arithmetic in the optimized models is float64; inputs and original
-centroid means use float32. Mathematical equivalence is not a claim of bitwise
-agreement for every possible nearly tied distance.
-
-## Reproduce
-
-Use Python 3 with NumPy, Matplotlib, and threadpoolctl. The measured environment
-used Python 3.10.12, NumPy 1.24.3 and eight OpenBLAS threads; full metadata is in
-the JSON. Keep the official CIFAR-100 Python files under `dataset/cifar-100-python/`.
-The dataset is available at https://www.cs.toronto.edu/~kriz/cifar.html.
-
-Run from this directory:
+Use Python 3 and create a virtual environment:
 
 ```bash
-python3 -B -m unittest discover -s src -p test_optimized.py -v
-MPLBACKEND=Agg python3 -B src/benchmark.py --full --threads 8 --batch-size 128
-python3 -B report/build_figures.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install numpy matplotlib threadpoolctl
 ```
 
-The benchmark refuses to overwrite `results/cpu_benchmark.json`. Before rerunning,
-archive the existing `results/` directory under a different name; the runner
-creates a fresh one. Keep the archived results if comparing timings between runs.
-The report's numerical text describes the supplied run; if results change, update
-that text together with the figures.
+## Prepare CIFAR-100
 
-Running `python3 -B src/main.py` instead executes the original, substantially
-slower implementation and opens plots after evaluation. No CUDA installation is
-needed for either CPU implementation.
+Download the **CIFAR-100 Python version** from the
+[official dataset page](https://www.cs.toronto.edu/~kriz/cifar.html).
+Extract it so these files are present:
 
-## Compile the report
+```text
+dataset/cifar-100-python/train
+dataset/cifar-100-python/test
+dataset/cifar-100-python/meta
+```
 
-Use XeLaTeX, IEEEtran, TikZ, listings, polyglossia and the FreeSerif, FreeSans and
-DejaVu Sans Mono fonts. From `report/`, run:
+The dataset is not included in the submission.
+
+## Run the playground
 
 ```bash
-latexmk -xelatex -interaction=nonstopmode -halt-on-error report.tex
+python playground/playground.py
 ```
 
-The supplied IEEE journal sample was used for the report structure and is
-preserved under `report/template/`. The compiled PDF has no personal author name.
+This displays k-NN and NCC on a small two-dimensional example. It does not
+require CIFAR-100.
+
+## Run the original classifiers
+
+```bash
+python src/main.py
+```
+
+This evaluates 1-NN, 3-NN and NCC on the full test set and then displays
+prediction examples. The original k-NN implementation can take a long time.
+
+## Recreate the full evaluation using the optimized classifiers
+
+```bash
+MPLBACKEND=Agg python src/benchmark.py --full --threads 8 --batch-size 128
+```
+
+This runs reference agreement checks and evaluates all 10,000 test images
+using all 50,000 training images. It creates the `results/` directory with
+new measurements and predictions; these generated files are not included
+in the submission. No GPU is required.
+
+Before repeating the command, rename the existing `results/` directory to
+preserve the previous run. The runner refuses to overwrite an existing
+`results/cpu_benchmark.json`.
+
+## Run the automated checks
+
+```bash
+python -m unittest discover -s src -p test_optimized.py -v
+```
